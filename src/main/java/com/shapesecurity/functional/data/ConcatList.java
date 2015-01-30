@@ -83,6 +83,12 @@ public abstract class ConcatList<T> {
   @NotNull
   public abstract Maybe<ConcatList<T>> update(int index, @NotNull T element);
 
+  @NotNull
+  public abstract Maybe<ConcatList<T>> subList(int startIndex, int endIndex);
+
+  @NotNull
+  abstract ConcatList<T> subListInternal(int startIndex, int endIndex);
+
   public final static class Empty<T> extends ConcatList<T> {
     private Empty() {
       super(0);
@@ -145,6 +151,21 @@ public abstract class ConcatList<T> {
     @Override
     public Maybe<ConcatList<T>> update(int index, @NotNull T element) {
       return Maybe.nothing();
+    }
+
+    @NotNull
+    @Override
+    public Maybe<ConcatList<T>> subList(int startIndex, int endIndex) {
+      if (startIndex != 0 || endIndex != 0) {
+        return Maybe.nothing();
+      }
+      return Maybe.just(this);
+    }
+
+    @NotNull
+    @Override
+    ConcatList<T> subListInternal(int startIndex, int endIndex) {
+      return this;
     }
   }
 
@@ -217,6 +238,30 @@ public abstract class ConcatList<T> {
     @Override
     public Maybe<ConcatList<T>> update(int index, @NotNull T element) {
       return index == 0 ? Maybe.just(single(element)) : Maybe.nothing();
+    }
+
+    @NotNull
+    @Override
+    public Maybe<ConcatList<T>> subList(int startIndex, int endIndex) {
+      if (startIndex < 0) {
+        return Maybe.nothing();
+      }
+      if (endIndex > 1) {
+        return Maybe.nothing();
+      }
+      if (startIndex > endIndex) {
+        return Maybe.nothing();
+      }
+      if (startIndex == endIndex) {
+        return Maybe.just(empty());
+      }
+      return Maybe.just(this);
+    }
+
+    @NotNull
+    @Override
+    ConcatList<T> subListInternal(int startIndex, int endIndex) {
+      return startIndex == endIndex ? empty() : this;
     }
   }
 
@@ -293,7 +338,9 @@ public abstract class ConcatList<T> {
     @NotNull
     @Override
     public Maybe<ConcatList<T>> update(int index, @NotNull T element) {
-      if (index >= this.length) { return Maybe.nothing(); }
+      if (index >= this.length) {
+        return Maybe.nothing();
+      }
       ConcatList<T> left = this.left;
       ConcatList<T> right = this.right;
 
@@ -303,6 +350,47 @@ public abstract class ConcatList<T> {
         right = right.update(index - this.left.length, element).just();
       }
       return Maybe.just(left.append(right));
+    }
+
+    @NotNull
+    @Override
+    public Maybe<ConcatList<T>> subList(int startIndex, int endIndex) {
+      if (startIndex < 0) {
+        return Maybe.nothing();
+      }
+      if (endIndex > 1) {
+        return Maybe.nothing();
+      }
+      if (startIndex > endIndex) {
+        return Maybe.nothing();
+      }
+      if (startIndex == endIndex) {
+        return Maybe.just(empty());
+      }
+
+      if (endIndex <= this.left.length) {
+        return this.left.subList(startIndex, endIndex);
+      }
+      if (startIndex >= this.left.length) {
+        return this.right.subList(startIndex - this.length, endIndex);
+      }
+
+      return this.right.subList(startIndex - this.length, endIndex);
+    }
+
+    @NotNull
+    @Override
+    ConcatList<T> subListInternal(int startIndex, int endIndex) {
+      if (endIndex <= this.left.length) {
+        return this.left.subListInternal(startIndex, endIndex);
+      }
+      if (startIndex >= this.left.length) {
+        return this.right.subListInternal(startIndex - this.left.length, endIndex);
+      }
+
+      return new Fork<>(
+          this.left.subListInternal(startIndex, this.left.length),
+          this.right.subListInternal(0, endIndex));
     }
   }
 
